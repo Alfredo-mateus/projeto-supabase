@@ -249,7 +249,11 @@ export default function Comprar() {
             <p className="text-gray-500 text-sm mb-2">
               O seu pedido foi recebido com sucesso. O administrador irá verificar o pagamento e libertar o acesso às aulas.
             </p>
-            <p className="text-gray-400 text-xs mb-8">
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4 text-left">
+                <p className="text-blue-800 text-xs font-semibold mb-0.5">📧 Confirme o seu email</p>
+                <p className="text-blue-600 text-xs">Enviámos um link de confirmação para <strong>{email}</strong>. Clique nesse link para activar a conta — precisará disso para entrar quando for aprovado.</p>
+              </div>
+              <p className="text-gray-400 text-xs mb-8">
               Prazo de verificação: até 24 horas. Guarde o seu email e senha — vai precisar para entrar nas aulas.
             </p>
             <button
