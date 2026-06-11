@@ -6,6 +6,8 @@ import Login from "@/pages/Login";
 import Comprar from "@/pages/Comprar";
 import Aulas from "@/pages/Aulas";
 import Admin from "@/pages/Admin";
+import ResetPassword from "@/pages/ResetPassword";
+import NovaSenha from "@/pages/NovaSenha";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,8 @@ function Router() {
       <Route path="/comprar" component={Comprar} />
       <Route path="/aulas" component={Aulas} />
       <Route path="/admin" component={Admin} />
+      <Route path="/redefinir-senha" component={ResetPassword} />
+      <Route path="/nova-senha" component={NovaSenha} />
       <Route component={NotFound} />
     </Switch>
   );

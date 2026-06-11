@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const { signIn, profile } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,19 +15,30 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-    if (error) {
+
+    const { error: signInError, user } = await signIn(email, password);
+    if (signInError || !user) {
       setError("Email ou senha incorretos. Tente novamente.");
+      setLoading(false);
       return;
     }
-    // Navigate based on role (profile may load async)
-    navigate("/aulas");
+
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (prof?.role === "admin") {
+      navigate("/admin");
+    } else {
+      navigate("/aulas");
+    }
+    setLoading(false);
   }
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
-      {/* Logo */}
       <div
         className="flex flex-col items-center mb-8 cursor-pointer"
         onClick={() => navigate("/")}
@@ -53,7 +65,15 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <span>Senha</span>
+              <span
+                className="float-right text-xs text-green-700 font-normal cursor-pointer hover:underline"
+                onClick={() => navigate("/redefinir-senha")}
+              >
+                Esqueci a senha
+              </span>
+            </label>
             <input
               type="password"
               required
@@ -93,7 +113,7 @@ export default function Login() {
             className="text-gray-400 text-xs cursor-pointer hover:text-gray-600"
             onClick={() => navigate("/")}
           >
-            ← Voltar ao inicio
+            ← Voltar ao início
           </span>
         </div>
       </div>
