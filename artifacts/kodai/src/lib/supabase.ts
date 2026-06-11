@@ -22,6 +22,8 @@ import { createClient } from "@supabase/supabase-js";
     status: "pending" | "approved" | "rejected";
     payment_proof_url: string | null;
     rejection_reason: string | null;
+    approved_at: string | null;
+    approved_by: string | null;
     created_at: string;
   };
 
@@ -29,7 +31,7 @@ import { createClient } from "@supabase/supabase-js";
     id: string;
     title: string;
     description: string | null;
-    video_url: string;
+    video_url: string | null;
     order_index: number;
     created_at: string;
   };
@@ -39,6 +41,7 @@ import { createClient } from "@supabase/supabase-js";
     user_id: string;
     lesson_id: string;
     completed: boolean;
+    watched_at: string | null;
     completed_at: string | null;
   };
 
