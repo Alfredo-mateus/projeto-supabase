@@ -23,7 +23,12 @@ export default function Admin() {
   const [lessonUrl, setLessonUrl] = useState("");
   const [lessonSaving, setLessonSaving] = useState(false);
 
-  // Lesson edit
+  // Rejection modal
+    const [rejectingId, setRejectingId] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [rejectSaving, setRejectSaving] = useState(false);
+
+    // Lesson edit
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -269,7 +274,7 @@ export default function Admin() {
                                   className="px-3 py-1 bg-green-700 text-white text-xs font-medium rounded-lg hover:bg-green-800 transition">
                                   Aprovar
                                 </button>
-                                <button onClick={() => updateEnrollment(e.id, "rejected")}
+                                <button onClick={() => { setRejectingId(e.id); setRejectionReason(""); }}
                                   className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 transition">
                                   Rejeitar
                                 </button>
@@ -505,6 +510,40 @@ export default function Admin() {
           </form>
         )}
       </div>
+
+        {/* ── REJECTION MODAL ── */}
+        {rejectingId && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Rejeitar inscrição</h3>
+              <p className="text-gray-500 text-sm mb-4">
+                Indica o motivo da rejeição. O aluno receberá este motivo por email.
+              </p>
+              <textarea
+                value={rejectionReason}
+                onChange={e => setRejectionReason(e.target.value)}
+                placeholder="Ex: Comprovante ilegível, valor incorreto, transferência não identificada…"
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 transition resize-none mb-4"
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => { setRejectingId(null); setRejectionReason(""); }}
+                  className="px-5 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={rejectSaving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition disabled:opacity-60"
+                >
+                  {rejectSaving ? "A rejeitar…" : "Confirmar rejeição"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
