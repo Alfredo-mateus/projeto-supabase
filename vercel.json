@@ -1,0 +1,6 @@
+{
+  "installCommand": "npm install -g pnpm@9 --silent && pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm --filter @workspace/kodai run build",
+  "outputDirectory": "artifacts/kodai/dist/public",
+  "framework": null
+}
