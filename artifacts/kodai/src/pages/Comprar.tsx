@@ -71,11 +71,11 @@ export default function Comprar() {
     setLoading(true);
 
     const ext = file.name.split(".").pop();
-    const path = `${enrollmentId}.${ext}`;
+    const filePath = `${enrollmentId}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("payment-proofs")
-      .upload(path, file, { upsert: true });
+      .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
       setError("Erro ao enviar comprovante. Tente novamente.");
@@ -83,13 +83,10 @@ export default function Comprar() {
       return;
     }
 
-    const { data: urlData } = supabase.storage
-      .from("payment-proofs")
-      .getPublicUrl(path);
-
+    // Store the file path (not public URL — bucket is private)
     await supabase
       .from("enrollments")
-      .update({ payment_proof_url: urlData.publicUrl })
+      .update({ payment_proof_url: filePath })
       .eq("id", enrollmentId);
 
     setStep("sucesso");
@@ -125,7 +122,7 @@ export default function Comprar() {
         {step === "dados" && (
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Os seus dados</h1>
-            <p className="text-gray-500 text-sm mb-7">Preencha os seus dados para criar a conta.</p>
+            <p className="text-gray-500 text-sm mb-7">Preencha os seus dados para criar a conta e aceder ao curso.</p>
             <form onSubmit={handleDados} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
@@ -170,11 +167,17 @@ export default function Comprar() {
         {step === "pagamento" && (
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Comprovante de pagamento</h1>
-            <p className="text-gray-500 text-sm mb-2">Realize o pagamento e envie o comprovante aqui.</p>
+            <p className="text-gray-500 text-sm mb-4">Realize o pagamento e envie o comprovante aqui.</p>
 
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-              <p className="text-green-800 text-sm font-medium mb-1">Dados para pagamento</p>
-              <p className="text-green-700 text-sm">Contacte o administrador para obter os dados bancários.</p>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 space-y-2">
+              <p className="text-green-800 text-sm font-semibold">📲 Dados para pagamento</p>
+              <div className="text-green-700 text-sm space-y-1">
+                <p><span className="font-medium">Banco:</span> BAI — Banco Angolano de Investimentos</p>
+                <p><span className="font-medium">IBAN:</span> AO06 0040 0000 0000 0000 0000 0</p>
+                <p><span className="font-medium">Nome:</span> KODAI Formação Lda.</p>
+                <p><span className="font-medium">Referência:</span> KODAI-PROG-MOBILE</p>
+              </div>
+              <p className="text-green-600 text-xs mt-2">Após o pagamento, envie o comprovante abaixo. O acesso será activado em até 24h.</p>
             </div>
 
             <form onSubmit={handlePagamento} className="space-y-4">
@@ -225,11 +228,11 @@ export default function Comprar() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">Comprovante enviado!</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">Comprovante enviado! 🎉</h1>
             <p className="text-gray-500 text-sm mb-2">
-              O seu pedido foi recebido com sucesso. O administrador irá verificar o pagamento e libertar o acesso às aulas.
+              O seu pedido foi recebido com sucesso. O administrador irá verificar o pagamento e libertar o acesso às aulas de programação.
             </p>
-            <p className="text-gray-400 text-xs mb-8">Será notificado por email quando o acesso for aprovado.</p>
+            <p className="text-gray-400 text-xs mb-8">Será notificado por email quando o acesso for aprovado. Prazo: até 24 horas.</p>
             <button
               onClick={() => navigate("/login")}
               className="px-8 py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-all shadow-sm"

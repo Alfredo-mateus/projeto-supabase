@@ -24,7 +24,7 @@ export default function Admin() {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
     if (profile && profile.role !== "admin") { navigate("/aulas"); return; }
-    loadData();
+    if (profile?.role === "admin") loadData();
   }, [user, profile, authLoading]);
 
   async function loadData() {
@@ -39,12 +39,24 @@ export default function Admin() {
   }
 
   async function updateEnrollment(id: string, status: "approved" | "rejected") {
-    await supabase.from("enrollments").update({
+    const { error } = await supabase.from("enrollments").update({
       status,
       approved_at: status === "approved" ? new Date().toISOString() : null,
       approved_by: user!.id,
     }).eq("id", id);
-    setEnrollments(prev => prev.map(e => e.id === id ? { ...e, status } : e));
+    if (!error) {
+      setEnrollments(prev => prev.map(e => e.id === id ? { ...e, status } : e));
+    }
+  }
+
+  async function viewProof(filePath: string) {
+    // Generate a signed URL valid for 60 seconds
+    const { data } = await supabase.storage
+      .from("payment-proofs")
+      .createSignedUrl(filePath, 60);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, "_blank");
+    }
   }
 
   async function addLesson(e: React.FormEvent) {
@@ -64,6 +76,7 @@ export default function Admin() {
   }
 
   async function deleteLesson(id: string) {
+    if (!confirm("Tens a certeza que queres eliminar esta aula?")) return;
     await supabase.from("lessons").delete().eq("id", id);
     setLessons(prev => prev.filter(l => l.id !== id));
   }
@@ -139,52 +152,57 @@ export default function Admin() {
             {enrollments.length === 0 ? (
               <div className="p-10 text-center text-gray-400 text-sm">Nenhuma inscrição ainda.</div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    {["Nome", "Email", "Telefone", "Estado", "Data", "Comprovante", "Ações"].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {enrollments.map((e, i) => (
-                    <tr key={e.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{e.full_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.email}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.phone}</td>
-                      <td className="px-4 py-3">{statusBadge(e.status)}</td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">{new Date(e.created_at).toLocaleDateString("pt-PT")}</td>
-                      <td className="px-4 py-3">
-                        {e.payment_proof_url ? (
-                          <a href={e.payment_proof_url} target="_blank" rel="noopener noreferrer"
-                            className="text-green-700 text-xs font-medium hover:underline">Ver</a>
-                        ) : <span className="text-gray-300 text-xs">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        {e.status === "pending" && (
-                          <div className="flex gap-2">
-                            <button onClick={() => updateEnrollment(e.id, "approved")}
-                              className="px-3 py-1 bg-green-700 text-white text-xs font-medium rounded-lg hover:bg-green-800 transition">
-                              Aprovar
-                            </button>
-                            <button onClick={() => updateEnrollment(e.id, "rejected")}
-                              className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 transition">
-                              Rejeitar
-                            </button>
-                          </div>
-                        )}
-                        {e.status !== "pending" && (
-                          <button onClick={() => updateEnrollment(e.id, "pending")}
-                            className="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-lg hover:bg-gray-200 transition">
-                            Repor
-                          </button>
-                        )}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      {["Nome", "Email", "Telefone", "Estado", "Data", "Comprovante", "Ações"].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {enrollments.map((e, i) => (
+                      <tr key={e.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{e.full_name}</td>
+                        <td className="px-4 py-3 text-gray-600">{e.email}</td>
+                        <td className="px-4 py-3 text-gray-600">{e.phone}</td>
+                        <td className="px-4 py-3">{statusBadge(e.status)}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{new Date(e.created_at).toLocaleDateString("pt-PT")}</td>
+                        <td className="px-4 py-3">
+                          {e.payment_proof_url ? (
+                            <button
+                              onClick={() => viewProof(e.payment_proof_url!)}
+                              className="text-green-700 text-xs font-medium hover:underline">
+                              Ver
+                            </button>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {e.status === "pending" && (
+                            <div className="flex gap-2">
+                              <button onClick={() => updateEnrollment(e.id, "approved")}
+                                className="px-3 py-1 bg-green-700 text-white text-xs font-medium rounded-lg hover:bg-green-800 transition">
+                                Aprovar
+                              </button>
+                              <button onClick={() => updateEnrollment(e.id, "rejected")}
+                                className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-lg hover:bg-red-200 transition">
+                                Rejeitar
+                              </button>
+                            </div>
+                          )}
+                          {e.status !== "pending" && (
+                            <button onClick={() => updateEnrollment(e.id, "pending")}
+                              className="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-lg hover:bg-gray-200 transition">
+                              Repor
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -201,16 +219,16 @@ export default function Admin() {
 
             {showLessonForm && (
               <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm mb-4">
-                <h3 className="font-semibold text-gray-900 mb-4">Nova aula</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">Nova aula de programação</h3>
                 <form onSubmit={addLesson} className="space-y-3">
                   <input required value={lessonTitle} onChange={e => setLessonTitle(e.target.value)}
-                    placeholder="Título da aula"
+                    placeholder="Título da aula (ex: Introdução ao JavaScript no celular)"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600 transition" />
                   <textarea value={lessonDesc} onChange={e => setLessonDesc(e.target.value)}
                     placeholder="Descrição (opcional)" rows={2}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600 transition resize-none" />
                   <input value={lessonUrl} onChange={e => setLessonUrl(e.target.value)}
-                    placeholder="URL do vídeo (YouTube ou link direto)"
+                    placeholder="URL do vídeo (YouTube: https://youtube.com/watch?v=... ou link direto)"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-600 transition" />
                   <div className="flex gap-3 pt-1">
                     <button type="submit" disabled={lessonSaving}
@@ -227,8 +245,9 @@ export default function Admin() {
             )}
 
             {lessons.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400 text-sm shadow-sm">
-                Nenhuma aula ainda. Adicione a primeira!
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center shadow-sm">
+                <span className="text-4xl mb-3 block">📱</span>
+                <p className="text-gray-400 text-sm">Nenhuma aula ainda. Adicione a primeira aula de programação!</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -240,10 +259,15 @@ export default function Admin() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 text-sm">{l.title}</p>
                       {l.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{l.description}</p>}
-                      {l.video_url && <p className="text-xs text-green-600 mt-0.5 truncate">{l.video_url}</p>}
+                      {l.video_url && (
+                        <a href={l.video_url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-green-600 mt-0.5 truncate block hover:underline">
+                          {l.video_url}
+                        </a>
+                      )}
                     </div>
                     <button onClick={() => deleteLesson(l.id)}
-                      className="text-red-400 hover:text-red-600 transition flex-shrink-0">
+                      className="text-red-400 hover:text-red-600 transition flex-shrink-0 p-1">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>

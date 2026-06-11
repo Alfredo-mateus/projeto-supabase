@@ -10,7 +10,7 @@ export default function Landing() {
         <div className="w-24 h-24 rounded-full bg-green-700 flex items-center justify-center shadow-lg mb-3">
           <span className="text-white font-black text-2xl tracking-widest">KODAI</span>
         </div>
-        <p className="text-gray-500 text-sm font-medium tracking-wider uppercase">Plataforma de Cursos</p>
+        <p className="text-gray-500 text-sm font-medium tracking-wider uppercase">Curso de Programação Mobile</p>
       </div>
 
       {/* Video Player */}
@@ -30,11 +30,25 @@ export default function Landing() {
       {/* Headline */}
       <div className="text-center mb-8 max-w-lg">
         <h1 className="text-3xl font-bold text-gray-900 mb-3 leading-tight">
-          Comece a sua jornada <span className="text-green-700">KODAI</span> hoje
+          Aprende a programar usando apenas o teu <span className="text-green-700">telemóvel</span>
         </h1>
         <p className="text-gray-500 text-base">
-          Aceda a aulas de qualidade, aprenda ao seu ritmo e transforme a sua carreira.
+          Com o KODAI aprendes programação do zero, no teu ritmo, sem precisar de computador — só com o celular na mão.
         </p>
+      </div>
+
+      {/* Feature highlights */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8 w-full max-w-lg">
+        {[
+          { icon: "📱", text: "100% no celular" },
+          { icon: "🚀", text: "Do zero ao avançado" },
+          { icon: "🎯", text: "Aulas práticas" },
+        ].map(f => (
+          <div key={f.text} className="flex-1 flex items-center gap-2 bg-green-50 rounded-xl px-4 py-3">
+            <span className="text-xl">{f.icon}</span>
+            <span className="text-green-800 text-sm font-medium">{f.text}</span>
+          </div>
+        ))}
       </div>
 
       {/* Buttons */}

@@ -16,27 +16,33 @@ export default function Aulas() {
     if (!user) { navigate("/login"); return; }
 
     async function load() {
-      // Check enrollment status
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("*")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      const isAdmin = profile?.role === "admin";
 
-      setEnrollment(enr as Enrollment | null);
-
-      if (enr?.status === "approved" || profile?.role === "admin") {
-        const { data: ls } = await supabase
-          .from("lessons")
+      // Check enrollment status (admins bypass this)
+      if (!isAdmin) {
+        const { data: enr } = await supabase
+          .from("enrollments")
           .select("*")
-          .order("order_index", { ascending: true });
-        const lessonList = (ls as Lesson[]) ?? [];
-        setLessons(lessonList);
-        if (lessonList.length > 0) setSelectedLesson(lessonList[0]);
+          .eq("user_id", user!.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        setEnrollment(enr as Enrollment | null);
+
+        if (enr?.status !== "approved") {
+          setLoading(false);
+          return;
+        }
       }
 
+      // Load lessons (admin always loads, approved students load)
+      const { data: ls } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("order_index", { ascending: true });
+      const lessonList = (ls as Lesson[]) ?? [];
+      setLessons(lessonList);
+      if (lessonList.length > 0) setSelectedLesson(lessonList[0]);
       setLoading(false);
     }
 
@@ -70,7 +76,7 @@ export default function Aulas() {
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Aguardando aprovação</h1>
         <p className="text-gray-500 text-sm text-center max-w-xs mb-6">
-          O seu pagamento está a ser verificado pelo administrador. Será notificado em breve.
+          O seu pagamento está a ser verificado. Assim que for aprovado terá acesso imediato às aulas de programação.
         </p>
         <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-gray-600">
           Sair
@@ -90,18 +96,28 @@ export default function Aulas() {
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Pagamento rejeitado</h1>
         <p className="text-gray-500 text-sm text-center max-w-xs mb-6">
-          O seu comprovante foi rejeitado. Por favor contacte o administrador.
+          O seu comprovante foi rejeitado. Por favor contacte o administrador para mais informações.
         </p>
+        <button onClick={() => navigate("/comprar")}
+          className="px-6 py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition mb-3">
+          Tentar novamente
+        </button>
         <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-gray-600">Sair</button>
       </div>
     );
   }
 
-  // No enrollment
-  if (!enrollment) {
+  // No enrollment (and not admin)
+  if (!enrollment && profile?.role !== "admin") {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
-        <p className="text-gray-500 text-sm mb-4">Precisa de comprar o curso para aceder às aulas.</p>
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+          <span className="text-3xl">📱</span>
+        </div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Ainda não tens acesso</h1>
+        <p className="text-gray-500 text-sm text-center max-w-xs mb-6">
+          Adquire o curso KODAI para começares a aprender a programar com o teu telemóvel.
+        </p>
         <button onClick={() => navigate("/comprar")}
           className="px-6 py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition">
           Comprar curso
@@ -118,7 +134,10 @@ export default function Aulas() {
           <div className="w-9 h-9 rounded-full bg-green-700 flex items-center justify-center">
             <span className="text-white font-black text-xs tracking-widest">K</span>
           </div>
-          <span className="font-bold text-gray-900">KODAI</span>
+          <div>
+            <span className="font-bold text-gray-900">KODAI</span>
+            <span className="ml-2 text-xs text-gray-400">Programação Mobile</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           {profile?.role === "admin" && (
@@ -138,12 +157,13 @@ export default function Aulas() {
         {/* Sidebar — lesson list */}
         <aside className="w-72 bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0">
           <div className="p-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">Conteúdo do Curso</h2>
+            <h2 className="font-semibold text-gray-900 text-sm">📱 Programação com Celular</h2>
             <p className="text-xs text-gray-400 mt-0.5">{lessons.length} aula{lessons.length !== 1 ? "s" : ""}</p>
           </div>
           {lessons.length === 0 ? (
             <div className="p-6 text-center text-gray-400 text-sm">
-              Nenhuma aula disponível ainda.
+              Nenhuma aula disponível ainda.<br />
+              <span className="text-xs">Em breve novos conteúdos!</span>
             </div>
           ) : (
             <ul className="py-2">
@@ -181,32 +201,41 @@ export default function Aulas() {
               {/* Video */}
               <div className="bg-gray-900 rounded-2xl overflow-hidden aspect-video mb-5 flex items-center justify-center">
                 {selectedLesson.video_url ? (
-                  selectedLesson.video_url.includes("youtube.com") || selectedLesson.video_url.includes("youtu.be") ? (
-                    <iframe
-                      src={selectedLesson.video_url.replace("watch?v=", "embed/")}
-                      className="w-full h-full"
-                      allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    />
-                  ) : (
-                    <video src={selectedLesson.video_url} controls className="w-full h-full" />
-                  )
+                  (() => {
+                    const url = selectedLesson.video_url;
+                    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+                      const videoId = url.includes("youtu.be")
+                        ? url.split("youtu.be/")[1]?.split("?")[0]
+                        : url.split("v=")[1]?.split("&")[0];
+                      return (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${videoId}`}
+                          className="w-full h-full"
+                          allowFullScreen
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        />
+                      );
+                    }
+                    return <video src={url} controls className="w-full h-full" />;
+                  })()
                 ) : (
                   <div className="flex flex-col items-center text-white/50">
-                    <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
+                    <span className="text-5xl mb-3">📱</span>
                     <p className="text-sm">Vídeo em breve</p>
                   </div>
                 )}
               </div>
               {selectedLesson.description && (
-                <p className="text-gray-600 text-sm leading-relaxed">{selectedLesson.description}</p>
+                <div className="bg-white rounded-xl border border-gray-100 p-5">
+                  <h3 className="font-semibold text-gray-900 text-sm mb-2">Sobre esta aula</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">{selectedLesson.description}</p>
+                </div>
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Selecione uma aula para começar.
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <span className="text-5xl mb-3">📱</span>
+              <p className="text-sm">Selecione uma aula para começar.</p>
             </div>
           )}
         </main>
