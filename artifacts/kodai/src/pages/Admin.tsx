@@ -103,14 +103,11 @@ export default function Admin() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-green-700 flex items-center justify-center">
-            <span className="text-white font-black text-xs">K</span>
+        <div className="flex items-center gap-2">
+          <div className="bg-gray-950 rounded-xl overflow-hidden h-9 w-24 flex items-center justify-center">
+            <img src="/kodai-logo-original.png" alt="KODAI" className="w-full h-auto object-cover object-center scale-150" />
           </div>
-          <div>
-            <span className="font-bold text-gray-900">KODAI</span>
-            <span className="ml-2 text-xs text-gray-400 font-medium uppercase tracking-wide">Admin</span>
-          </div>
+          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Admin</span>
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate("/aulas")} className="text-sm text-green-700 hover:underline">Ver Aulas</button>

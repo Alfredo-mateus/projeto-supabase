@@ -7,10 +7,13 @@ export default function Landing() {
     <div className="min-h-screen bg-white flex flex-col items-center justify-start py-10 px-4">
       {/* Logo */}
       <div className="flex flex-col items-center mb-8">
-        <div className="w-24 h-24 rounded-full bg-green-700 flex items-center justify-center shadow-lg mb-3">
-          <span className="text-white font-black text-2xl tracking-widest">KODAI</span>
+        <div className="bg-gray-950 rounded-2xl shadow-lg overflow-hidden w-80">
+          <img
+            src="/kodai-logo-original.png"
+            alt="KODAI — Programe pelo Celular"
+            className="w-full h-auto object-contain"
+          />
         </div>
-        <p className="text-gray-500 text-sm font-medium tracking-wider uppercase">Curso de Programação Mobile</p>
       </div>
 
       {/* Video Player */}

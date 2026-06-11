@@ -97,8 +97,8 @@ export default function Comprar() {
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
       {/* Logo */}
       <div className="flex flex-col items-center mb-8 cursor-pointer" onClick={() => navigate("/")}>
-        <div className="w-16 h-16 rounded-full bg-green-700 flex items-center justify-center shadow mb-2">
-          <span className="text-white font-black text-base tracking-widest">KODAI</span>
+        <div className="bg-gray-950 rounded-2xl overflow-hidden w-52 shadow-md">
+          <img src="/kodai-logo-original.png" alt="KODAI" className="w-full h-auto object-contain" />
         </div>
       </div>
 

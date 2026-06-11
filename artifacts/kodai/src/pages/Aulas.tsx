@@ -130,13 +130,9 @@ export default function Aulas() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-green-700 flex items-center justify-center">
-            <span className="text-white font-black text-xs tracking-widest">K</span>
-          </div>
-          <div>
-            <span className="font-bold text-gray-900">KODAI</span>
-            <span className="ml-2 text-xs text-gray-400">Programação Mobile</span>
+        <div className="flex items-center gap-2">
+          <div className="bg-gray-950 rounded-xl overflow-hidden h-9 w-24 flex items-center justify-center">
+            <img src="/kodai-logo-original.png" alt="KODAI" className="w-full h-auto object-cover object-center scale-150" />
           </div>
         </div>
         <div className="flex items-center gap-4">
