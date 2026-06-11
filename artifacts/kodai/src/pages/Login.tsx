@@ -18,7 +18,12 @@ export default function Login() {
 
     const { error: signInError, user } = await signIn(email, password);
     if (signInError || !user) {
-      setError("Email ou senha incorretos. Tente novamente.");
+      const msg = (signInError?.message ?? "").toLowerCase();
+      if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
+        setError("Confirme o seu email antes de entrar. Verifique a caixa de entrada (e o spam).");
+      } else {
+        setError("Email ou senha incorretos. Tente novamente.");
+      }
       setLoading(false);
       return;
     }
