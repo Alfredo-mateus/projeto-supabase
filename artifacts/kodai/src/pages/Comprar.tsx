@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
+import { supabase, loadSiteSettings, type SiteSettings } from "@/lib/supabase";
 
 type Step = "dados" | "pagamento" | "sucesso";
 
@@ -9,23 +9,25 @@ export default function Comprar() {
   const [step, setStep] = useState<Step>("dados");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [settings, setSettings] = useState<SiteSettings>({});
 
-  // Step 1 — personal data
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Step 2 — payment proof
   const [file, setFile] = useState<File | null>(null);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSiteSettings().then(setSettings);
+  }, []);
 
   async function handleDados(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    // Create auth account
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -40,7 +42,6 @@ export default function Comprar() {
       return;
     }
 
-    // Create enrollment
     const { data: enrollment, error: enrollErr } = await supabase
       .from("enrollments")
       .insert({
@@ -54,7 +55,7 @@ export default function Comprar() {
       .single();
 
     if (enrollErr) {
-      setError("Erro ao registar. Tente novamente.");
+      setError("Erro ao registar inscrição. Tente novamente.");
       setLoading(false);
       return;
     }
@@ -78,12 +79,11 @@ export default function Comprar() {
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
-      setError("Erro ao enviar comprovante. Tente novamente.");
+      setError("Erro ao enviar comprovante. Verifique o formato do ficheiro e tente novamente.");
       setLoading(false);
       return;
     }
 
-    // Store the file path (not public URL — bucket is private)
     await supabase
       .from("enrollments")
       .update({ payment_proof_url: filePath })
@@ -92,6 +92,13 @@ export default function Comprar() {
     setStep("sucesso");
     setLoading(false);
   }
+
+  const bank = settings.payment_bank || "BAI — Banco Angolano de Investimentos";
+  const iban = settings.payment_iban || "";
+  const paymentName = settings.payment_name || "";
+  const reference = settings.payment_reference || "";
+  const price = settings.course_price ? parseInt(settings.course_price).toLocaleString("pt-PT") : null;
+  const currency = settings.currency ?? "AOA";
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
@@ -118,11 +125,20 @@ export default function Comprar() {
       )}
 
       <div className="w-full max-w-sm">
-        {/* STEP 1 — Personal data */}
+        {/* STEP 1 */}
         {step === "dados" && (
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Os seus dados</h1>
             <p className="text-gray-500 text-sm mb-7">Preencha os seus dados para criar a conta e aceder ao curso.</p>
+            {price && (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-6">
+                <span className="text-2xl">🎓</span>
+                <div>
+                  <p className="text-green-800 font-semibold text-sm">Curso KODAI — Programe pelo Celular</p>
+                  <p className="text-green-700 font-bold">{price} {currency} <span className="font-normal text-xs">acesso vitalício</span></p>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleDados} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
@@ -151,7 +167,7 @@ export default function Comprar() {
               {error && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
               <button type="submit" disabled={loading}
                 className="w-full py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-all shadow-sm disabled:opacity-60">
-                {loading ? "A processar..." : "Continuar"}
+                {loading ? "A processar..." : "Continuar →"}
               </button>
             </form>
             <p className="mt-4 text-center text-gray-500 text-sm">
@@ -163,19 +179,20 @@ export default function Comprar() {
           </>
         )}
 
-        {/* STEP 2 — Payment proof */}
+        {/* STEP 2 */}
         {step === "pagamento" && (
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Comprovante de pagamento</h1>
             <p className="text-gray-500 text-sm mb-4">Realize o pagamento e envie o comprovante aqui.</p>
 
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 space-y-2">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 space-y-1.5">
               <p className="text-green-800 text-sm font-semibold">📲 Dados para pagamento</p>
               <div className="text-green-700 text-sm space-y-1">
-                <p><span className="font-medium">Banco:</span> BAI — Banco Angolano de Investimentos</p>
-                <p><span className="font-medium">IBAN:</span> AO06 0040 0000 0000 0000 0000 0</p>
-                <p><span className="font-medium">Nome:</span> KODAI Formação Lda.</p>
-                <p><span className="font-medium">Referência:</span> KODAI-PROG-MOBILE</p>
+                {bank && <p><span className="font-medium">Banco:</span> {bank}</p>}
+                {iban && <p><span className="font-medium">IBAN:</span> {iban}</p>}
+                {paymentName && <p><span className="font-medium">Nome:</span> {paymentName}</p>}
+                {reference && <p><span className="font-medium">Referência:</span> {reference}</p>}
+                {price && <p><span className="font-medium">Valor:</span> {price} {currency}</p>}
               </div>
               <p className="text-green-600 text-xs mt-2">Após o pagamento, envie o comprovante abaixo. O acesso será activado em até 24h.</p>
             </div>
@@ -204,7 +221,7 @@ export default function Comprar() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       <p className="text-sm">Clique para selecionar o ficheiro</p>
-                      <p className="text-xs">JPG, PNG ou PDF</p>
+                      <p className="text-xs">JPG, PNG ou PDF (máx. 10MB)</p>
                     </div>
                   )}
                   <input id="file-input" type="file" accept="image/*,.pdf" className="hidden"
@@ -220,7 +237,7 @@ export default function Comprar() {
           </>
         )}
 
-        {/* STEP 3 — Success */}
+        {/* STEP 3 */}
         {step === "sucesso" && (
           <div className="text-center py-6">
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
@@ -230,9 +247,11 @@ export default function Comprar() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-3">Comprovante enviado! 🎉</h1>
             <p className="text-gray-500 text-sm mb-2">
-              O seu pedido foi recebido com sucesso. O administrador irá verificar o pagamento e libertar o acesso às aulas de programação.
+              O seu pedido foi recebido com sucesso. O administrador irá verificar o pagamento e libertar o acesso às aulas.
             </p>
-            <p className="text-gray-400 text-xs mb-8">Será notificado por email quando o acesso for aprovado. Prazo: até 24 horas.</p>
+            <p className="text-gray-400 text-xs mb-8">
+              Prazo de verificação: até 24 horas. Guarde o seu email e senha — vai precisar para entrar nas aulas.
+            </p>
             <button
               onClick={() => navigate("/login")}
               className="px-8 py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-all shadow-sm"

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { supabase, type Lesson, type Enrollment } from "@/lib/supabase";
+import { supabase, type Lesson, type Enrollment, type LessonProgress } from "@/lib/supabase";
 
 export default function Aulas() {
   const [, navigate] = useLocation();
@@ -9,50 +9,84 @@ export default function Aulas() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [progress, setProgress] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
-
-    async function load() {
-      const isAdmin = profile?.role === "admin";
-
-      // Check enrollment status (admins bypass this)
-      if (!isAdmin) {
-        const { data: enr } = await supabase
-          .from("enrollments")
-          .select("*")
-          .eq("user_id", user!.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-        setEnrollment(enr as Enrollment | null);
-
-        if (enr?.status !== "approved") {
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Load lessons (admin always loads, approved students load)
-      const { data: ls } = await supabase
-        .from("lessons")
-        .select("*")
-        .order("order_index", { ascending: true });
-      const lessonList = (ls as Lesson[]) ?? [];
-      setLessons(lessonList);
-      if (lessonList.length > 0) setSelectedLesson(lessonList[0]);
-      setLoading(false);
-    }
-
     load();
   }, [user, profile, authLoading]);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const isAdmin = profile?.role === "admin";
+
+    if (!isAdmin) {
+      const { data: enr } = await supabase
+        .from("enrollments")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      setEnrollment(enr as Enrollment | null);
+
+      if (enr?.status !== "approved") {
+        setLoading(false);
+        return;
+      }
+    }
+
+    const [{ data: ls }, { data: prog }] = await Promise.all([
+      supabase.from("lessons").select("*").order("order_index", { ascending: true }),
+      supabase.from("lesson_progress").select("lesson_id, completed").eq("user_id", user.id),
+    ]);
+
+    const lessonList = (ls as Lesson[]) ?? [];
+    const progressMap: Record<string, boolean> = {};
+    ((prog ?? []) as LessonProgress[]).forEach(p => {
+      progressMap[p.lesson_id] = p.completed;
+    });
+
+    setLessons(lessonList);
+    setProgress(progressMap);
+    if (lessonList.length > 0) setSelectedLesson(lessonList[0]);
+    setLoading(false);
+  }, [user, profile]);
+
+  async function toggleComplete(lessonId: string) {
+    if (!user || togglingId) return;
+    setTogglingId(lessonId);
+    const current = progress[lessonId] ?? false;
+    const next = !current;
+
+    if (next) {
+      await supabase.from("lesson_progress").upsert({
+        user_id: user.id,
+        lesson_id: lessonId,
+        completed: true,
+        watched_at: new Date().toISOString(),
+      }, { onConflict: "user_id,lesson_id" });
+    } else {
+      await supabase.from("lesson_progress")
+        .update({ completed: false })
+        .eq("user_id", user.id)
+        .eq("lesson_id", lessonId);
+    }
+
+    setProgress(prev => ({ ...prev, [lessonId]: next }));
+    setTogglingId(null);
+  }
 
   async function handleSignOut() {
     await signOut();
     navigate("/");
   }
+
+  const completedCount = Object.values(progress).filter(Boolean).length;
+  const isAdmin = profile?.role === "admin";
 
   if (authLoading || loading) {
     return (
@@ -65,7 +99,6 @@ export default function Aulas() {
     );
   }
 
-  // Pending approval
   if (enrollment?.status === "pending") {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
@@ -78,14 +111,14 @@ export default function Aulas() {
         <p className="text-gray-500 text-sm text-center max-w-xs mb-6">
           O seu pagamento está a ser verificado. Assim que for aprovado terá acesso imediato às aulas de programação.
         </p>
-        <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-gray-600">
-          Sair
-        </button>
+        <p className="text-gray-400 text-xs mb-6 text-center max-w-xs">
+          Prazo de verificação: até 24 horas. Guarde o seu email e senha para entrar quando aprovado.
+        </p>
+        <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-gray-600">Sair</button>
       </div>
     );
   }
 
-  // Rejected
   if (enrollment?.status === "rejected") {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
@@ -107,8 +140,7 @@ export default function Aulas() {
     );
   }
 
-  // No enrollment (and not admin)
-  if (!enrollment && profile?.role !== "admin") {
+  if (!enrollment && !isAdmin) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
         <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
@@ -129,14 +161,25 @@ export default function Aulas() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
+      <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
           <div className="bg-gray-950 rounded-xl overflow-hidden h-9 w-24 flex items-center justify-center">
             <img src="/kodai-logo-original.png" alt="KODAI" className="w-full h-auto object-cover object-center scale-150" />
           </div>
+          {lessons.length > 0 && (
+            <div className="hidden sm:flex items-center gap-2 bg-green-50 rounded-lg px-3 py-1.5">
+              <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-600 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.round((completedCount / lessons.length) * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-green-700 font-medium">{completedCount}/{lessons.length} concluídas</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4">
-          {profile?.role === "admin" && (
+          {isAdmin && (
             <button onClick={() => navigate("/admin")}
               className="text-sm text-green-700 font-medium hover:underline">
               Painel Admin
@@ -150,11 +193,22 @@ export default function Aulas() {
       </header>
 
       <div className="flex h-[calc(100vh-65px)]">
-        {/* Sidebar — lesson list */}
+        {/* Sidebar */}
         <aside className="w-72 bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0">
           <div className="p-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900 text-sm">📱 Programação com Celular</h2>
             <p className="text-xs text-gray-400 mt-0.5">{lessons.length} aula{lessons.length !== 1 ? "s" : ""}</p>
+            {lessons.length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.round((completedCount / lessons.length) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500">{Math.round((completedCount / lessons.length) * 100)}%</span>
+              </div>
+            )}
           </div>
           {lessons.length === 0 ? (
             <div className="p-6 text-center text-gray-400 text-sm">
@@ -171,11 +225,15 @@ export default function Aulas() {
                       ${selectedLesson?.id === lesson.id ? "bg-green-50 border-r-2 border-green-700" : ""}`}
                   >
                     <span className={`mt-0.5 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold
-                      ${selectedLesson?.id === lesson.id ? "bg-green-700 text-white" : "bg-gray-100 text-gray-500"}`}>
-                      {idx + 1}
+                      ${progress[lesson.id] ? "bg-green-600 text-white" : selectedLesson?.id === lesson.id ? "bg-green-700 text-white" : "bg-gray-100 text-gray-500"}`}>
+                      {progress[lesson.id] ? (
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : idx + 1}
                     </span>
-                    <div>
-                      <p className={`text-sm font-medium ${selectedLesson?.id === lesson.id ? "text-green-800" : "text-gray-800"}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${progress[lesson.id] ? "text-green-700" : selectedLesson?.id === lesson.id ? "text-green-800" : "text-gray-800"}`}>
                         {lesson.title}
                       </p>
                       {lesson.description && (
@@ -189,23 +247,51 @@ export default function Aulas() {
           )}
         </aside>
 
-        {/* Main content */}
+        {/* Main */}
         <main className="flex-1 overflow-y-auto p-6">
           {selectedLesson ? (
             <div className="max-w-3xl">
-              <h1 className="text-xl font-bold text-gray-900 mb-4">{selectedLesson.title}</h1>
+              <div className="flex items-start justify-between mb-4 gap-4">
+                <h1 className="text-xl font-bold text-gray-900 leading-snug">{selectedLesson.title}</h1>
+                {!isAdmin && (
+                  <button
+                    onClick={() => toggleComplete(selectedLesson.id)}
+                    disabled={!!togglingId}
+                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border
+                      ${progress[selectedLesson.id]
+                        ? "bg-green-700 text-white border-green-700 hover:bg-green-800"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-green-500 hover:text-green-700"
+                      } disabled:opacity-50`}
+                  >
+                    {progress[selectedLesson.id] ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Concluída
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Marcar concluída
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
               {/* Video */}
               <div className="bg-gray-900 rounded-2xl overflow-hidden aspect-video mb-5 flex items-center justify-center">
                 {selectedLesson.video_url ? (
                   (() => {
                     const url = selectedLesson.video_url;
-                    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-                      const videoId = url.includes("youtu.be")
-                        ? url.split("youtu.be/")[1]?.split("?")[0]
-                        : url.split("v=")[1]?.split("&")[0];
+                    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+                    if (ytMatch) {
                       return (
                         <iframe
-                          src={`https://www.youtube.com/embed/${videoId}`}
+                          src={`https://www.youtube.com/embed/${ytMatch[1]}`}
                           className="w-full h-full"
                           allowFullScreen
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -221,12 +307,37 @@ export default function Aulas() {
                   </div>
                 )}
               </div>
+
               {selectedLesson.description && (
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                   <h3 className="font-semibold text-gray-900 text-sm mb-2">Sobre esta aula</h3>
                   <p className="text-gray-600 text-sm leading-relaxed">{selectedLesson.description}</p>
                 </div>
               )}
+
+              {/* Navigation between lessons */}
+              <div className="flex gap-3 mt-5">
+                {lessons.findIndex(l => l.id === selectedLesson.id) > 0 && (
+                  <button
+                    onClick={() => setSelectedLesson(lessons[lessons.findIndex(l => l.id === selectedLesson.id) - 1])}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-green-400 transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Anterior
+                  </button>
+                )}
+                {lessons.findIndex(l => l.id === selectedLesson.id) < lessons.length - 1 && (
+                  <button
+                    onClick={() => setSelectedLesson(lessons[lessons.findIndex(l => l.id === selectedLesson.id) + 1])}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition ml-auto">
+                    Próxima aula
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">

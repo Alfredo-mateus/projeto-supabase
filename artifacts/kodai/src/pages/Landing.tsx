@@ -1,7 +1,24 @@
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { loadSiteSettings, type SiteSettings } from "@/lib/supabase";
+
+function youtubeEmbedId(url: string): string | null {
+  if (!url) return null;
+  const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return yt ? yt[1] : null;
+}
 
 export default function Landing() {
   const [, navigate] = useLocation();
+  const [settings, setSettings] = useState<SiteSettings>({});
+
+  useEffect(() => {
+    loadSiteSettings().then(setSettings);
+  }, []);
+
+  const videoId = youtubeEmbedId(settings.landing_video_url ?? "");
+  const price = settings.course_price ? parseInt(settings.course_price).toLocaleString("pt-PT") : null;
+  const currency = settings.currency ?? "AOA";
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-start py-10 px-4">
@@ -18,16 +35,27 @@ export default function Landing() {
 
       {/* Video Player */}
       <div className="w-full max-w-2xl bg-gray-900 rounded-2xl overflow-hidden shadow-xl mb-8 aspect-video flex items-center justify-center relative">
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-          <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center bg-white/10 backdrop-blur-sm mb-4 cursor-pointer hover:bg-white/20 transition-all duration-200">
-            <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-          <p className="text-white/70 text-sm">Vídeo de apresentação em breve</p>
-        </div>
-        {/* Decorative gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 to-gray-900/80 pointer-events-none" />
+        {videoId ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}`}
+            className="w-full h-full"
+            allowFullScreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
+              <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center bg-white/10 backdrop-blur-sm mb-4">
+                <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              <p className="text-white/70 text-sm">Vídeo de apresentação</p>
+              <p className="text-white/40 text-xs mt-1">(configurar no painel admin)</p>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-green-900/40 to-gray-900/80 pointer-events-none" />
+          </>
+        )}
       </div>
 
       {/* Headline */}
@@ -38,6 +66,12 @@ export default function Landing() {
         <p className="text-gray-500 text-base">
           Com o KODAI aprendes programação do zero, no teu ritmo, sem precisar de computador — só com o celular na mão.
         </p>
+        {price && (
+          <div className="mt-4 inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-5 py-2">
+            <span className="text-green-800 font-bold text-xl">{price} {currency}</span>
+            <span className="text-green-600 text-sm">acesso vitalício</span>
+          </div>
+        )}
       </div>
 
       {/* Feature highlights */}
@@ -70,7 +104,6 @@ export default function Landing() {
         </button>
       </div>
 
-      {/* Footer */}
       <p className="mt-12 text-xs text-gray-400">&copy; {new Date().getFullYear()} KODAI. Todos os direitos reservados.</p>
     </div>
   );
