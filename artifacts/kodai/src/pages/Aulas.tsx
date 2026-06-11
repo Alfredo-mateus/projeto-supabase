@@ -168,9 +168,15 @@ export default function Aulas() {
           </svg>
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Comprovante rejeitado</h1>
-        <p className="text-gray-500 text-sm text-center max-w-xs mb-6">
-          O seu comprovante foi rejeitado. Envie um novo comprovante de pagamento válido.
-        </p>
+                <p className="text-gray-500 text-sm text-center max-w-xs mb-3">
+            O seu comprovante foi rejeitado. Envie um novo comprovante de pagamento válido.
+          </p>
+          {enrollment.rejection_reason && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 max-w-xs text-left">
+              <p className="text-red-700 text-xs font-semibold mb-0.5">Motivo indicado pelo admin:</p>
+              <p className="text-red-600 text-xs">{enrollment.rejection_reason}</p>
+            </div>
+          )}
 
         {reuploadDone ? (
           <div className="bg-green-50 border border-green-200 rounded-xl px-6 py-4 text-center max-w-xs">
