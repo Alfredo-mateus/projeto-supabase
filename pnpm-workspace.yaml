@@ -1,5 +1,5 @@
 packages:
-    - artifacts/*
+    - artifacts/kodai
 
   catalog:
     '@tailwindcss/vite': ^4.1.14
